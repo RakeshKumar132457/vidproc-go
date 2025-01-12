@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -63,4 +64,3 @@ func NewDB(dbPath string) (*sql.DB, error) {
 
 	return db, nil
 }
-

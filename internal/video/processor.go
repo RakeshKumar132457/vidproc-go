@@ -138,4 +138,3 @@ func (p *FFmpegProcessor) Merge(ctx context.Context, inputPaths []string, output
 
 	return nil
 }
-

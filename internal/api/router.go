@@ -4,35 +4,27 @@ import (
 	"database/sql"
 	"net/http"
 	"vidproc-go/internal/config"
+	"vidproc-go/internal/storage"
+	"vidproc-go/internal/video"
 )
 
 type Router struct {
-	db     *sql.DB
-	config config.Config
+	db        *sql.DB
+	config    config.Config
+	storage   storage.VideoStorage
+	processor video.Processor
 }
 
 func NewRouter(db *sql.DB, cfg config.Config) *Router {
+	videoStorage := storage.NewVideoStorage(db)
+	videoProcessor := video.NewFFmpegProcessor()
+
 	return &Router{
-		db:     db,
-		config: cfg,
+		db:        db,
+		config:    cfg,
+		storage:   videoStorage,
+		processor: videoProcessor,
 	}
-}
-
-func (r *Router) SetupRoutes() http.Handler {
-	mux := http.NewServeMux()
-	middleware := Chain(
-		LoggingMiddleware,
-		AuthMiddleware(r.config.APIToken),
-	)
-
-	protected := http.NewServeMux()
-	protected.HandleFunc("/api/videos", r.handleVideos)
-	protected.HandleFunc("/api/videos/", r.handleVideoOperations)
-
-	mux.HandleFunc("/health", r.handleHealth)
-	mux.Handle("/api/", middleware(protected))
-
-	return mux
 }
 
 func Chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) http.Handler {
@@ -44,32 +36,34 @@ func Chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) ht
 	}
 }
 
+func (r *Router) SetupRoutes() http.Handler {
+	mux := http.NewServeMux()
+	middleware := Chain(
+		LoggingMiddleware,
+		AuthMiddleware(r.config.APIToken),
+	)
+
+	videoHandler := NewVideoHandler(r.config, r.storage)
+	shareHandler := NewShareHandler(r.config, r.storage)
+
+	protected := http.NewServeMux()
+
+	protected.HandleFunc("/api/videos", videoHandler.HandleVideos)
+	protected.HandleFunc("/api/videos/trim/", videoHandler.HandleTrim)
+	protected.HandleFunc("/api/videos/merge", videoHandler.HandleMerge)
+
+	protected.HandleFunc("/api/shares", shareHandler.HandleShares)
+	protected.HandleFunc("/api/shares/", shareHandler.HandleShareOperations)
+
+	mux.HandleFunc("/health", r.handleHealth)
+
+	mux.Handle("/api/", middleware(protected))
+
+	return mux
+}
+
 func (r *Router) handleHealth(w http.ResponseWriter, req *http.Request) {
 	SendSuccess(w, http.StatusOK, map[string]string{
 		"status": "available",
 	}, "service is healthy")
-}
-
-func (r *Router) handleVideos(w http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodPost:
-		r.handleVideoUpload(w, req)
-	case http.MethodGet:
-		r.handleListVideos(w, req)
-	default:
-		SendError(w, http.StatusMethodNotAllowed, "method not allowed")
-	}
-}
-
-func (r *Router) handleVideoOperations(w http.ResponseWriter, req *http.Request) {
-
-	SendError(w, http.StatusNotImplemented, "not implemented yet")
-}
-
-func (r *Router) handleVideoUpload(w http.ResponseWriter, req *http.Request) {
-	SendError(w, http.StatusNotImplemented, "video upload not implemented yet")
-}
-
-func (r *Router) handleListVideos(w http.ResponseWriter, req *http.Request) {
-	SendError(w, http.StatusNotImplemented, "list videos not implemented yet")
 }

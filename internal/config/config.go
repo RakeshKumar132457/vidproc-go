@@ -9,22 +9,22 @@ import (
 )
 
 type Config struct {
-	Port        string
-	Environment string
-	APIToken string
+	Port             string
+	Environment      string
+	APIToken         string
 	DBPath           string
 	VideoStoragePath string
-	MaxVideoSize int64
-	MaxDuration  int
-	MinDuration  int
+	MaxVideoSize     int64
+	MaxDuration      int
+	MinDuration      int
 }
 
 const (
-	defaultPort         = "8080"
-	defaultEnvironment  = "development"
-	defaultMaxVideoSize = 25 * 1024 * 1024
-	defaultMaxVideoDuration  = 25
-	defaultMinVideoDuration  = 5
+	defaultPort             = "8080"
+	defaultEnvironment      = "development"
+	defaultMaxVideoSize     = 25 * 1024 * 1024
+	defaultMaxVideoDuration = 25
+	defaultMinVideoDuration = 5
 )
 
 func Load() (Config, error) {

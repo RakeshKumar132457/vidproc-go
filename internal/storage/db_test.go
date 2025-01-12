@@ -71,4 +71,3 @@ func TestNewDB(t *testing.T) {
 		})
 	}
 }
-
