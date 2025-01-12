@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"vidproc-go/internal/config"
 	"vidproc-go/internal/storage"
+	"vidproc-go/internal/video"
 )
 
 func (m *MockVideoStorage) SaveVideo(ctx context.Context, video *storage.Video) error {
@@ -42,6 +44,41 @@ func (m *MockVideoStorage) UpdateVideoStatus(ctx context.Context, id string, sta
 	return nil
 }
 
+type MockProcessor struct {
+	getVideoInfoFunc func(ctx context.Context, filepath string) (*video.VideoInfo, error)
+	trimFunc         func(ctx context.Context, input, output string, start, end float64) error
+	mergeFunc        func(ctx context.Context, inputs []string, output string) error
+}
+
+func (m *MockProcessor) GetVideoInfo(ctx context.Context, filepath string) (*video.VideoInfo, error) {
+	if m.getVideoInfoFunc != nil {
+		return m.getVideoInfoFunc(ctx, filepath)
+	}
+	return &video.VideoInfo{
+		Duration: 10,
+		Format:   "mp4",
+		Size:     1024,
+	}, nil
+}
+
+func (m *MockProcessor) Trim(ctx context.Context, input, output string, start, end float64) error {
+	if m.trimFunc != nil {
+		return m.trimFunc(ctx, input, output, start, end)
+	}
+	return nil
+}
+
+func (m *MockProcessor) Merge(ctx context.Context, inputs []string, output string) error {
+	if m.mergeFunc != nil {
+		return m.mergeFunc(ctx, inputs, output)
+	}
+	return nil
+}
+
+func (h *VideoHandler) SetProcessor(p video.Processor) {
+	h.processor = p
+}
+
 func setupTestEnvironment(t *testing.T) (config.Config, string, func()) {
 
 	tmpDir, err := os.MkdirTemp("", "videoapi-test-")
@@ -63,30 +100,28 @@ func setupTestEnvironment(t *testing.T) (config.Config, string, func()) {
 	return cfg, tmpDir, cleanup
 }
 
-func createTestVideo(t *testing.T) (*bytes.Buffer, *multipart.Writer) {
-	var b bytes.Buffer
-	w := multipart.NewWriter(&b)
-
-	fw, err := w.CreateFormFile("video", "test.mp4")
-	if err != nil {
-		t.Fatalf("Failed to create form file: %v", err)
-	}
-
-	_, err = fw.Write([]byte("dummy video content"))
-	if err != nil {
-		t.Fatalf("Failed to write test data: %v", err)
-	}
-
-	w.Close()
-	return &b, w
-}
-
 func TestHandleUpload(t *testing.T) {
 	cfg, _, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
+	err := os.MkdirAll(cfg.VideoStoragePath, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create video storage directory: %v", err)
+	}
+
 	mockStorage := NewMockStorage()
+	mockProcessor := &MockProcessor{
+		getVideoInfoFunc: func(ctx context.Context, filepath string) (*video.VideoInfo, error) {
+			return &video.VideoInfo{
+				Duration: 10,
+				Format:   "mp4",
+				Size:     1024,
+			}, nil
+		},
+	}
+
 	handler := NewVideoHandler(cfg, mockStorage)
+	handler.processor = mockProcessor
 
 	tests := []struct {
 		name         string
@@ -98,9 +133,24 @@ func TestHandleUpload(t *testing.T) {
 			name:   "successful upload",
 			method: http.MethodPost,
 			setupReq: func() (*http.Request, error) {
-				body, w := createTestVideo(t)
+				body := &bytes.Buffer{}
+				writer := multipart.NewWriter(body)
+				part, err := writer.CreateFormFile("video", "test.mp4")
+				if err != nil {
+					return nil, err
+				}
+
+				content := []byte("fake video content")
+				if _, err := part.Write(content); err != nil {
+					return nil, err
+				}
+
+				if err := writer.Close(); err != nil {
+					return nil, err
+				}
+
 				req := httptest.NewRequest(http.MethodPost, "/api/videos", body)
-				req.Header.Set("Content-Type", w.FormDataContentType())
+				req.Header.Set("Content-Type", writer.FormDataContentType())
 				return req, nil
 			},
 			expectedCode: http.StatusCreated,
@@ -109,7 +159,7 @@ func TestHandleUpload(t *testing.T) {
 			name:   "wrong method",
 			method: http.MethodGet,
 			setupReq: func() (*http.Request, error) {
-				return httptest.NewRequest(http.MethodGet, "/api/videos", nil), nil
+				return httptest.NewRequest(http.MethodPut, "/api/videos", nil), nil
 			},
 			expectedCode: http.StatusMethodNotAllowed,
 		},
@@ -123,22 +173,47 @@ func TestHandleUpload(t *testing.T) {
 			}
 
 			rr := httptest.NewRecorder()
-			handler.handleUpload(rr, req)
+			handler.HandleVideos(rr, req)
 
 			if status := rr.Code; status != tt.expectedCode {
-				t.Errorf("handler returned wrong status code: got %v want %v",
-					status, tt.expectedCode)
+				t.Errorf("handler returned wrong status code: got %v want %v\nResponse body: %v",
+					status, tt.expectedCode, rr.Body.String())
 			}
 		})
 	}
 }
 
 func TestHandleTrim(t *testing.T) {
-	cfg, _, cleanup := setupTestEnvironment(t)
+	cfg, tmpDir, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
+	err := os.MkdirAll(cfg.VideoStoragePath, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create video storage directory: %v", err)
+	}
+
 	mockStorage := NewMockStorage()
+	mockProcessor := &MockProcessor{
+		getVideoInfoFunc: func(ctx context.Context, filepath string) (*video.VideoInfo, error) {
+			return &video.VideoInfo{
+				Duration: 10,
+				Format:   "mp4",
+				Size:     1024,
+			}, nil
+		},
+		trimFunc: func(ctx context.Context, input, output string, start, end float64) error {
+			return nil
+		},
+	}
+
 	handler := NewVideoHandler(cfg, mockStorage)
+	handler.SetProcessor(mockProcessor)
+
+	testVideoPath := filepath.Join(tmpDir, "test.mp4")
+	err = os.WriteFile(testVideoPath, []byte("dummy video content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test video file: %v", err)
+	}
 
 	testVideo := &storage.Video{
 		ID:       "test-video",
@@ -229,11 +304,30 @@ func TestHandleTrim(t *testing.T) {
 }
 
 func TestHandleMerge(t *testing.T) {
-	cfg, _, cleanup := setupTestEnvironment(t)
+	cfg, tmpDir, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
+	err := os.MkdirAll(cfg.VideoStoragePath, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create video storage directory: %v", err)
+	}
+
 	mockStorage := NewMockStorage()
+	mockProcessor := &MockProcessor{
+		getVideoInfoFunc: func(ctx context.Context, filepath string) (*video.VideoInfo, error) {
+			return &video.VideoInfo{
+				Duration: 10,
+				Format:   "mp4",
+				Size:     1024,
+			}, nil
+		},
+		mergeFunc: func(ctx context.Context, inputs []string, output string) error {
+			return nil
+		},
+	}
+
 	handler := NewVideoHandler(cfg, mockStorage)
+	handler.SetProcessor(mockProcessor)
 
 	testVideos := []*storage.Video{
 		{
@@ -253,6 +347,11 @@ func TestHandleMerge(t *testing.T) {
 	}
 
 	for _, video := range testVideos {
+		videoPath := filepath.Join(tmpDir, video.Filename)
+		err = os.WriteFile(videoPath, []byte("dummy video content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create test video file: %v", err)
+		}
 		mockStorage.SaveVideo(context.Background(), video)
 	}
 
@@ -300,8 +399,8 @@ func TestHandleMerge(t *testing.T) {
 			handler.HandleMerge(rr, req)
 
 			if status := rr.Code; status != tt.wantStatus {
-				t.Errorf("Handler returned wrong status code: got %v want %v",
-					status, tt.wantStatus)
+				t.Errorf("Handler returned wrong status code: got %v want %v\nResponse body: %v",
+					status, tt.wantStatus, rr.Body.String())
 			}
 
 			if tt.wantErrMsg != "" {

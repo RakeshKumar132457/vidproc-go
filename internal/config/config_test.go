@@ -7,11 +7,11 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	origEnv := make(map[string]string)
-	envVars := []string{"DB_PATH", "VIDEO_STORAGE_PATH", "API_TOKEN", "MAX_VIDEO_SIZE", "MAX_VIDEO_DURATION", "MIN_VIDEO_DURATION"}
+	envVars := []string{"DB_PATH", "VIDEO_STORAGE_PATH", "API_TOKEN_SECRET", "MAX_VIDEO_SIZE", "MAX_VIDEO_DURATION", "MIN_VIDEO_DURATION", "PORT", "ENVIRONMENT"}
+
 	for _, env := range envVars {
 		origEnv[env] = os.Getenv(env)
 	}
-
 	defer func() {
 		for k, v := range origEnv {
 			if v != "" {
@@ -36,7 +36,9 @@ func TestLoadConfig(t *testing.T) {
 				"MAX_VIDEO_SIZE":     "25000000",
 				"MAX_VIDEO_DURATION": "25",
 				"MIN_VIDEO_DURATION": "5",
-				"API_TOKEN":          "test-token",
+				"API_TOKEN_SECRET":   "test-token",
+				"PORT":               "8080",
+				"ENVIRONMENT":        "development",
 			},
 			wantErr: false,
 			expected: Config{
@@ -46,6 +48,8 @@ func TestLoadConfig(t *testing.T) {
 				MaxDuration:      25,
 				MinDuration:      5,
 				APIToken:         "test-token",
+				Port:             "8080",
+				Environment:      "development",
 			},
 		},
 		{
@@ -58,10 +62,12 @@ func TestLoadConfig(t *testing.T) {
 			envVars: map[string]string{
 				"DB_PATH":            "/app/data/db/videos.db",
 				"VIDEO_STORAGE_PATH": "/app/data/videos",
-				"API_TOKEN":          "test-token",
+				"API_TOKEN_SECRET":   "test-token",
 				"MAX_VIDEO_SIZE":     "invalid",
 				"MAX_VIDEO_DURATION": "invalid",
 				"MIN_VIDEO_DURATION": "invalid",
+				"PORT":               "8080",
+				"ENVIRONMENT":        "development",
 			},
 			wantErr: false,
 			expected: Config{
@@ -71,6 +77,8 @@ func TestLoadConfig(t *testing.T) {
 				MaxVideoSize:     defaultMaxVideoSize,
 				MaxDuration:      defaultMaxVideoDuration,
 				MinDuration:      defaultMinVideoDuration,
+				Port:             "8080",
+				Environment:      "development",
 			},
 		},
 	}
