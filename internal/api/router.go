@@ -9,21 +9,24 @@ import (
 )
 
 type Router struct {
-	db        *sql.DB
-	config    config.Config
-	storage   storage.VideoStorage
-	processor video.Processor
+	db           *sql.DB
+	config       config.Config
+	storage      storage.VideoStorage
+	shareStorage storage.ShareLinkStorage
+	processor    video.Processor
 }
 
 func NewRouter(db *sql.DB, cfg config.Config) *Router {
 	videoStorage := storage.NewVideoStorage(db)
+	shareStorage := storage.NewShareLinkStorage(db)
 	videoProcessor := video.NewFFmpegProcessor()
 
 	return &Router{
-		db:        db,
-		config:    cfg,
-		storage:   videoStorage,
-		processor: videoProcessor,
+		db:           db,
+		config:       cfg,
+		storage:      videoStorage,
+		shareStorage: shareStorage,
+		processor:    videoProcessor,
 	}
 }
 
@@ -44,7 +47,7 @@ func (r *Router) SetupRoutes() http.Handler {
 	)
 
 	videoHandler := NewVideoHandler(r.config, r.storage)
-	shareHandler := NewShareHandler(r.config, r.storage)
+	shareHandler := NewShareHandler(r.config, r.storage, r.shareStorage)
 
 	protected := http.NewServeMux()
 

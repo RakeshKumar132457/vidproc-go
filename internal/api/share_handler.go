@@ -15,10 +15,17 @@ type ShareHandler struct {
 	share   storage.ShareLinkStorage
 }
 
-func NewShareHandler(cfg config.Config, store storage.VideoStorage) *ShareHandler {
+func NewShareHandler(cfg config.Config, store storage.VideoStorage, shareStore storage.ShareLinkStorage) *ShareHandler {
+	if store == nil {
+		panic("video storage cannot be nil")
+	}
+	if shareStore == nil {
+		panic("share storage cannot be nil")
+	}
 	return &ShareHandler{
 		config:  cfg,
 		storage: store,
+		share:   shareStore,
 	}
 }
 

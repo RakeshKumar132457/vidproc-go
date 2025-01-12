@@ -16,7 +16,7 @@ func TestHandleCreateShare(t *testing.T) {
 	defer cleanup()
 
 	mockStorage := NewMockStorage()
-	handler := NewShareHandler(cfg, mockStorage)
+	handler := NewShareHandler(cfg, mockStorage, mockStorage)
 
 	testVideo := &storage.Video{
 		ID:       "test-video",
@@ -106,7 +106,7 @@ func TestHandleGetShare(t *testing.T) {
 	defer cleanup()
 
 	mockStorage := NewMockStorage()
-	handler := NewShareHandler(cfg, mockStorage)
+	handler := NewShareHandler(cfg, mockStorage, mockStorage)
 
 	testVideo := &storage.Video{
 		ID:       "test-video",
@@ -190,7 +190,7 @@ func TestHandleListShares(t *testing.T) {
 	defer cleanup()
 
 	mockStorage := NewMockStorage()
-	handler := NewShareHandler(cfg, mockStorage)
+	handler := NewShareHandler(cfg, mockStorage, mockStorage)
 
 	testVideos := map[string]*storage.Video{
 		"video1": {
@@ -316,7 +316,7 @@ func TestHandleDeleteShare(t *testing.T) {
 	defer cleanup()
 
 	mockStorage := NewMockStorage()
-	handler := NewShareHandler(cfg, mockStorage)
+	handler := NewShareHandler(cfg, mockStorage, mockStorage)
 
 	testVideo := &storage.Video{
 		ID:       "test-video",

@@ -13,6 +13,14 @@ type ShareLink struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type SQLiteShareLinkStorage struct {
+	db *sql.DB
+}
+
+func NewShareLinkStorage(db *sql.DB) ShareLinkStorage {
+	return &SQLiteShareLinkStorage{db: db}
+}
+
 type ShareLinkStorage interface {
 	SaveShareLink(ctx context.Context, link *ShareLink) error
 	GetShareLink(ctx context.Context, id string) (*ShareLink, error)
@@ -21,7 +29,7 @@ type ShareLinkStorage interface {
 	DeleteShareLink(ctx context.Context, id string) error
 }
 
-func (s *SQLiteVideoStorage) SaveShareLink(ctx context.Context, link *ShareLink) error {
+func (s *SQLiteShareLinkStorage) SaveShareLink(ctx context.Context, link *ShareLink) error {
 	query := `
         INSERT INTO share_links (id, video_id, expires_at, created_at)
         VALUES (?, ?, ?, ?)
@@ -35,7 +43,7 @@ func (s *SQLiteVideoStorage) SaveShareLink(ctx context.Context, link *ShareLink)
 	return err
 }
 
-func (s *SQLiteVideoStorage) GetShareLink(ctx context.Context, id string) (*ShareLink, error) {
+func (s *SQLiteShareLinkStorage) GetShareLink(ctx context.Context, id string) (*ShareLink, error) {
 	query := `
         SELECT id, video_id, expires_at, created_at
         FROM share_links
@@ -57,7 +65,7 @@ func (s *SQLiteVideoStorage) GetShareLink(ctx context.Context, id string) (*Shar
 	return &link, nil
 }
 
-func (s *SQLiteVideoStorage) GetShareLinksByVideo(ctx context.Context, videoID string) ([]*ShareLink, error) {
+func (s *SQLiteShareLinkStorage) GetShareLinksByVideo(ctx context.Context, videoID string) ([]*ShareLink, error) {
 	query := `
         SELECT id, video_id, expires_at, created_at
         FROM share_links
@@ -87,7 +95,7 @@ func (s *SQLiteVideoStorage) GetShareLinksByVideo(ctx context.Context, videoID s
 	return links, rows.Err()
 }
 
-func (s *SQLiteVideoStorage) ListShareLinks(ctx context.Context) ([]*ShareLink, error) {
+func (s *SQLiteShareLinkStorage) ListShareLinks(ctx context.Context) ([]*ShareLink, error) {
 	query := `
         SELECT id, video_id, expires_at, created_at
         FROM share_links
@@ -116,7 +124,7 @@ func (s *SQLiteVideoStorage) ListShareLinks(ctx context.Context) ([]*ShareLink, 
 	return links, rows.Err()
 }
 
-func (s *SQLiteVideoStorage) DeleteShareLink(ctx context.Context, id string) error {
+func (s *SQLiteShareLinkStorage) DeleteShareLink(ctx context.Context, id string) error {
 	query := `DELETE FROM share_links WHERE id = ?`
 	_, err := s.db.ExecContext(ctx, query, id)
 	return err
