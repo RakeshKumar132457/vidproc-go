@@ -7,6 +7,6 @@ services:
     volumes:
       - ./data:/app/data
 
-    environment:
-      - .env
+    env_file:
+      - .env.docker
     restart: unless-stopped
