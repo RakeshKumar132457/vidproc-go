@@ -55,7 +55,7 @@ func (r *Router) SetupRoutes() http.Handler {
 	protected.HandleFunc("/api/shares", shareHandler.HandleShares)
 	protected.HandleFunc("/api/shares/", shareHandler.HandleShareOperations)
 
-	mux.HandleFunc("/health", r.handleHealth)
+	mux.HandleFunc("/api/health", r.handleHealth)
 
 	mux.Handle("/api/", middleware(protected))
 

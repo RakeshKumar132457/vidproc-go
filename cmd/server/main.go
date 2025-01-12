@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	"vidproc-go/internal/api"
 	"vidproc-go/internal/config"
 	"vidproc-go/internal/storage"
 )
@@ -31,7 +32,7 @@ func main() {
 	}
 	defer db.Close()
 
-	srv := setupServer(cfg, db)
+	srv := setupServer(&cfg, db)
 
 	go func() {
 		log.Printf("Starting server on port %s in %s mode", cfg.Port, cfg.Environment)
@@ -43,7 +44,9 @@ func main() {
 	gracefulShutdown(srv)
 }
 
-func setupServer(cfg config.Config, db *sql.DB) *http.Server {
+func setupServer(cfg *config.Config, db *sql.DB) *http.Server {
+	apiRouter := api.NewRouter(db, *cfg)
+	handler := apiRouter.SetupRoutes()
 
 	mux := http.NewServeMux()
 
@@ -52,11 +55,13 @@ func setupServer(cfg config.Config, db *sql.DB) *http.Server {
 		fmt.Fprintf(w, "OK - Environment: %s", cfg.Environment)
 	})
 
+	mux.Handle("/api/", handler)
+
 	return &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 10 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 }
