@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"net/http"
+	"vidproc-go/internal/api/swagger"
 	"vidproc-go/internal/config"
 	"vidproc-go/internal/storage"
 	"vidproc-go/internal/video"
@@ -41,6 +42,11 @@ func Chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) ht
 
 func (r *Router) SetupRoutes() http.Handler {
 	mux := http.NewServeMux()
+
+	swaggerHandler := swagger.Handler()
+	mux.Handle("/api/swagger/", http.StripPrefix("/api/swagger", swaggerHandler))
+	mux.Handle("/api/swagger.yaml", http.StripPrefix("/api", swaggerHandler))
+
 	middleware := Chain(
 		LoggingMiddleware,
 		AuthMiddleware(r.config.APIToken),
@@ -59,7 +65,6 @@ func (r *Router) SetupRoutes() http.Handler {
 	protected.HandleFunc("/api/shares/", shareHandler.HandleShareOperations)
 
 	mux.HandleFunc("/api/health", r.handleHealth)
-
 	mux.Handle("/api/", middleware(protected))
 
 	return mux

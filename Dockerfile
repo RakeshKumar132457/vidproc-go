@@ -15,7 +15,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -o /app/server ./cmd/server
 
 FROM alpine:latest
 
-RUN apk add --no-cache ffmpeg sqlite
+RUN apk add --no-cache ffmpeg sqlite curl
 
 WORKDIR /app
 

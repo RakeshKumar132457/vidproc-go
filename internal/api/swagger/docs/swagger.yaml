@@ -1,0 +1,312 @@
+openapi: 3.0.0
+info:
+  title: Video Processing API
+  description: API for uploading, processing, and sharing videos
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: Base API path
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+  
+  schemas:
+    Video:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the video
+        filename:
+          type: string
+          description: Name of the video file
+        size:
+          type: integer
+          description: Size of the video in bytes
+        duration:
+          type: integer
+          description: Duration of the video in seconds
+        status:
+          type: string
+          enum: [completed]
+          description: Processing status of the video
+    
+    ShareLink:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the share link
+        video_id:
+          type: string
+          description: ID of the shared video
+        expires_at:
+          type: string
+          format: date-time
+          description: Expiration timestamp of the share link
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp of the share link
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        status:
+          type: string
+          enum: [error]
+    
+    Success:
+      type: object
+      properties:
+        data:
+          type: object
+          description: Response data
+        message:
+          type: string
+          description: Success message
+        status:
+          type: string
+          enum: [success]
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Check API health
+      description: Returns the health status of the API
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+              example:
+                status: success
+                data:
+                  status: available
+                message: service is healthy
+
+  /videos:
+    get:
+      summary: List all videos
+      description: Returns a list of all uploaded videos
+      responses:
+        '200':
+          description: List of videos retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [success]
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Video'
+    
+    post:
+      summary: Upload a new video
+      description: Upload a new video file for processing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video:
+                  type: string
+                  format: binary
+                  description: Video file to upload
+      responses:
+        '201':
+          description: Video uploaded successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Video'
+
+  /videos/trim/{videoId}:
+    post:
+      summary: Trim a video
+      description: Create a new trimmed version of an existing video
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start:
+                  type: number
+                  description: Start time in seconds
+                end:
+                  type: number
+                  description: End time in seconds
+      responses:
+        '200':
+          description: Video trimmed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Video'
+
+  /videos/merge:
+    post:
+      summary: Merge multiple videos
+      description: Create a new video by merging multiple existing videos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                video_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: List of video IDs to merge
+                  minItems: 2
+      responses:
+        '200':
+          description: Videos merged successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Video'
+
+  /shares:
+    get:
+      summary: List share links
+      description: Returns a list of all active share links
+      parameters:
+        - name: video_id
+          in: query
+          schema:
+            type: string
+          description: Optional video ID to filter share links
+      responses:
+        '200':
+          description: Share links retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ShareLink'
+    
+    post:
+      summary: Create share link
+      description: Create a new share link for a video
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                video_id:
+                  type: string
+                  description: ID of the video to share
+                duration:
+                  type: integer
+                  description: Duration of share link validity in hours (1-168)
+      responses:
+        '201':
+          description: Share link created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ShareLink'
+
+  /shares/{shareId}:
+    get:
+      summary: Get share link details
+      description: Get details of a specific share link and its associated video
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Share link details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          share_link:
+                            $ref: '#/components/schemas/ShareLink'
+                          video:
+                            $ref: '#/components/schemas/Video'
+    
+    delete:
+      summary: Delete share link
+      description: Delete a specific share link
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Share link deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
